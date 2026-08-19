@@ -6,6 +6,8 @@
 <title>Step Click — pattern metronome</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="apple-touch-icon" sizes="180x180" href="/stepclickfavicon.png">
+ <link rel="icon" type="image/x-icon" href="/stepclickfavicon.png">
 <style>
   :root{
     --bg: #17140f;
@@ -685,7 +687,7 @@
   // To permanently bake a JSONBin connection into your own copy of this file
   // (so it works with zero setup even outside this chat), fill these in:
   const JSONBIN_API_KEY = '$2a$10$9ARHKeTmrEkoMWrFmawP5.TYxZEDkEJEzFWYcL5..gpywc6eaU.Hq';
-  const JSONBIN_BIN_ID = '6a83dd8cf5f4af5e2922d3d6';
+  const JSONBIN_BIN_ID = '6a81d591f5f4af5e291d3532';
   const JSONBIN_IS_ACCESS_KEY = false; // set true if JSONBIN_API_KEY above is a scoped Access Key
 
   let presets = {}; // name -> {bpm, numSteps, steps}
@@ -851,6 +853,7 @@
     playBtn.classList.add('playing');
     playLabel.textContent = 'Stop';
     playBtn.querySelector('.icon').textContent = '■';
+    requestWakeLock();
   }
 
   function stop(){
@@ -862,10 +865,41 @@
     playBtn.classList.remove('playing');
     playLabel.textContent = 'Play';
     playBtn.querySelector('.icon').textContent = '▶';
+    releaseWakeLock();
   }
 
   playBtn.addEventListener('click', () => {
     if (isPlaying) stop(); else start();
+  });
+
+  // ---------- Screen wake lock ----------
+  // Keeps the screen on while playing so iOS doesn't dim/lock and pause playback.
+  let wakeLock = null;
+  const wakeLockSupported = 'wakeLock' in navigator;
+
+  async function requestWakeLock(){
+    if (!wakeLockSupported) return;
+    try {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release', () => { wakeLock = null; });
+    } catch (e){
+      wakeLock = null; // permission denied, low battery mode, etc — playback continues regardless
+    }
+  }
+
+  function releaseWakeLock(){
+    if (wakeLock){
+      wakeLock.release().catch(() => {});
+      wakeLock = null;
+    }
+  }
+
+  // Wake lock is auto-released by the browser when the tab is backgrounded;
+  // re-acquire it when the user comes back if we're still playing.
+  document.addEventListener('visibilitychange', () => {
+    if (isPlaying && document.visibilityState === 'visible' && !wakeLock){
+      requestWakeLock();
+    }
   });
 
   // ---------- Presets ----------
